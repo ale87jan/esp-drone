@@ -31,9 +31,9 @@
  * @brief  Code function definitions for Crazyflie
  *
  */
-#include <stdio.h>      // sprintf(), vsnprintf(), printf()
+#include <stdio.h> // sprintf(), vsnprintf(), printf()
 #include <stdint.h>
-#include <string.h>     // strncpy(), strnlen()
+#include <string.h> // strncpy(), strnlen()
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -42,80 +42,104 @@
 #include "vl53l1x.h"
 #define DEBUG_MODULE "VLX1"
 #include "debug_cf.h"
+#include "vl53l1_api_debug.h"
 
 #ifdef PAL_EXTENDED
-	#include "vl53l1_register_strings.h"
+#include "vl53l1_register_strings.h"
 #else
-	#define VL53L1_get_register_name(a,b)
+#define VL53L1_get_register_name(a, b)
 #endif
 
 // Set the start address 8 step after the VL53L0 dynamic addresses
-//static int nextI2CAddress = VL53L1X_DEFAULT_ADDRESS+8;
-
+// static int nextI2CAddress = VL53L1X_DEFAULT_ADDRESS+8;
 
 bool vl53l1xInit(VL53L1_Dev_t *pdev, I2C_Dev *I2cHandle)
 {
-  VL53L1_Error status = VL53L1_ERROR_NONE;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 
-  pdev->I2cDevAddr = VL53L1X_DEFAULT_ADDRESS;
-  pdev->I2Cx = I2cHandle;
-  i2cdevInit(pdev->I2Cx);
+	pdev->I2cDevAddr = VL53L1X_DEFAULT_ADDRESS;
+	pdev->I2Cx = I2cHandle;
+	i2cdevInit(pdev->I2Cx);
 
-  /* Move initialized sensor to a new I2C address */
-  //int newAddress;
+	/* Move initialized sensor to a new I2C address */
+	// int newAddress;
 
-  //taskENTER_CRITICAL();
-  //newAddress = nextI2CAddress++;
-  //taskEXIT_CRITICAL();
+	// taskENTER_CRITICAL();
+	// newAddress = nextI2CAddress++;
+	// taskEXIT_CRITICAL();
 
-  //vl53l1xSetI2CAddress(pdev, newAddress);
+	// vl53l1xSetI2CAddress(pdev, newAddress);
 
-  uint8_t byteData;
-  uint16_t wordData;
-  VL53L1_RdByte(pdev, 0x010F, &byteData);
-  DEBUG_PRINT( "VL53L1X Model_ID: %02X\n\r", byteData);
-  VL53L1_RdByte(pdev, 0x0110, &byteData);
-  DEBUG_PRINT( "VL53L1X Module_Type: %02X\n\r", byteData);
-  VL53L1_RdWord(pdev, 0x010F, &wordData);
-  DEBUG_PRINT( "VL53L1X: %02X\n\r", wordData);
+	uint8_t byteData;
+	VL53L1_RdByte(pdev, 0x010F, &byteData);
+	DEBUG_PRINTI("Model_ID: %02X\n\r", byteData);
+	VL53L1_RdByte(pdev, 0x0110, &byteData);
+	DEBUG_PRINTI("Module_Type: %02X\n\r", byteData);
 
-  status = VL53L1_WaitDeviceBooted(pdev);
-  if (status == VL53L1_ERROR_NONE)
-  {
-	status = VL53L1_DataInit(pdev);
-
-	if (status == VL53L1_ERROR_NONE)
+	VL53L1_State state;
+	char buf[VL53L1_MAX_STRING_LENGTH];
+	// Check if the device is ready
+	status = VL53L1_GetPalState(pdev, &state);
+	if (status != VL53L1_ERROR_NONE)
 	{
-		status = VL53L1_StaticInit(pdev);
+		VL53L1_GetPalErrorString(status, buf);
+		DEBUG_PRINTE("GetPalState: %d - %s\n\r", status, buf);
+		return false;
 	}
-  }
+
+	status = VL53L1_GetPalStateString(state, buf);
+	DEBUG_PRINTI("PalState: %s\n\r", buf);
+
+	status = VL53L1_WaitDeviceBooted(pdev);
+	if (status != VL53L1_ERROR_NONE)
+	{
+		VL53L1_GetPalErrorString(status, buf);
+		DEBUG_PRINTE("WaitDeviceBooted: %d - %s\n\r", status, buf);
+		return false;
+	}
+
+	status = VL53L1_DataInit(pdev);
+	if (status != VL53L1_ERROR_NONE)
+	{
+		VL53L1_GetPalErrorString(status, buf);
+		DEBUG_PRINTE("DataInit: %d - %s\n\r", status, buf);
+		return false;
+	}
+
+	status = VL53L1_StaticInit(pdev);
+	if (status != VL53L1_ERROR_NONE)
+	{
+		VL53L1_GetPalErrorString(status, buf);
+		DEBUG_PRINTE("StaticInit: %d - %s\n\r", status, buf);
+		return false;
+	}
 
 #ifdef SET_VL53LX_ROI
-  VL53L1_UserRoi_t Roi0;
-  Roi0.TopLeftX = 0; //set ROI according to requirement
-  Roi0.TopLeftY = 15;
-  Roi0.BotRightX = 15;
-  Roi0.BotRightY = 0;
-  status = VL53L1_SetUserROI(pdev, &Roi0); //SET region of interest
+	VL53L1_UserRoi_t Roi0;
+	Roi0.TopLeftX = 0; // set ROI according to requirement
+	Roi0.TopLeftY = 15;
+	Roi0.BotRightX = 15;
+	Roi0.BotRightY = 0;
+	status = VL53L1_SetUserROI(pdev, &Roi0); // SET region of interest
 #endif
-	//Restart sensor remove to zranger task
-	//VL53L1_StopMeasurement(pdev);
-	//status = VL53L1_SetDistanceMode(pdev,VL53L1_DISTANCEMODE_LONG);
-	//status = VL53L1_SetMeasurementTimingBudgetMicroSeconds(pdev, 160000);
-	//status = VL53L1_SetInterMeasurementPeriodMilliSeconds(pdev, 200);  
-	//status = VL53L1_StartMeasurement(pdev);
+		// Restart sensor remove to zranger task
+		// VL53L1_StopMeasurement(pdev);
+		// status = VL53L1_SetDistanceMode(pdev,VL53L1_DISTANCEMODE_LONG);
+		// status = VL53L1_SetMeasurementTimingBudgetMicroSeconds(pdev, 160000);
+		// status = VL53L1_SetInterMeasurementPeriodMilliSeconds(pdev, 200);
+		// status = VL53L1_StartMeasurement(pdev);
 
-  return status == VL53L1_ERROR_NONE;
+	return status == VL53L1_ERROR_NONE;
 }
 
-bool vl53l1xTestConnection(VL53L1_Dev_t* pdev)
+bool vl53l1xTestConnection(VL53L1_Dev_t *pdev)
 {
-  VL53L1_DeviceInfo_t info;
-  VL53L1_Error status = VL53L1_ERROR_NONE;
+	VL53L1_DeviceInfo_t info;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 
-  status = VL53L1_GetDeviceInfo(pdev, &info);
+	status = VL53L1_GetDeviceInfo(pdev, &info);
 
-  return status == VL53L1_ERROR_NONE;
+	return status == VL53L1_ERROR_NONE;
 }
 
 /** Set I2C address
@@ -123,15 +147,14 @@ bool vl53l1xTestConnection(VL53L1_Dev_t* pdev)
  * The address passed is the 7bit I2C address from LSB (ie. without the
  * read/write bit)
  */
-VL53L1_Error vl53l1xSetI2CAddress(VL53L1_Dev_t* pdev, uint8_t address)
+VL53L1_Error vl53l1xSetI2CAddress(VL53L1_Dev_t *pdev, uint8_t address)
 {
-  VL53L1_Error status = VL53L1_ERROR_NONE;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 
-  status = VL53L1_SetDeviceAddress(pdev, address);
-  pdev->I2cDevAddr = address;
-  return  status;
+	status = VL53L1_SetDeviceAddress(pdev, address);
+	pdev->I2cDevAddr = address;
+	return status;
 }
-
 
 /*
  * ----------------- COMMS FUNCTIONS -----------------
@@ -139,103 +162,99 @@ VL53L1_Error vl53l1xSetI2CAddress(VL53L1_Dev_t* pdev, uint8_t address)
 
 VL53L1_Error VL53L1_WriteMulti(
 	VL53L1_Dev_t *pdev,
-	uint16_t      index,
-	uint8_t      *pdata,
-	uint32_t      count)
+	uint16_t index,
+	uint8_t *pdata,
+	uint32_t count)
 {
-	VL53L1_Error status         = VL53L1_ERROR_NONE;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 
-  if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, count, pdata))
-  {
-    status = VL53L1_ERROR_CONTROL_INTERFACE;
-  }
+	if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, count, pdata))
+	{
+		status = VL53L1_ERROR_CONTROL_INTERFACE;
+	}
 
 	return status;
 }
 
 VL53L1_Error VL53L1_ReadMulti(
 	VL53L1_Dev_t *pdev,
-	uint16_t      index,
-	uint8_t      *pdata,
-	uint32_t      count)
+	uint16_t index,
+	uint8_t *pdata,
+	uint32_t count)
 {
-	VL53L1_Error status         = VL53L1_ERROR_NONE;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 
-  if (!i2cdevRead16(pdev->I2Cx, pdev->I2cDevAddr, index, count, pdata))
-  {
-    status = VL53L1_ERROR_CONTROL_INTERFACE;
-  }
-
-	return status;
-}
-
-
-VL53L1_Error VL53L1_WrByte(
-	VL53L1_Dev_t *pdev,
-	uint16_t      index,
-	uint8_t       data)
-{
-	VL53L1_Error status         = VL53L1_ERROR_NONE;
-
-	if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, 1, &data))
+	if (!i2cdevRead16(pdev->I2Cx, pdev->I2cDevAddr, index, count, pdata))
 	{
-	  status = VL53L1_ERROR_CONTROL_INTERFACE;
+		status = VL53L1_ERROR_CONTROL_INTERFACE;
 	}
 
 	return status;
 }
 
-
-VL53L1_Error VL53L1_WrWord(
+VL53L1_Error VL53L1_WrByte(
 	VL53L1_Dev_t *pdev,
-	uint16_t      index,
-	uint16_t      data)
+	uint16_t index,
+	uint8_t data)
 {
-  VL53L1_Error status         = VL53L1_ERROR_NONE;
-  uint8_t _I2CBuffer[2];
-  _I2CBuffer[0] = data >> 8;
-  _I2CBuffer[1] = data & 0x00FF;
-  if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, 2, (uint8_t *)_I2CBuffer))
-  {
-    status = VL53L1_ERROR_CONTROL_INTERFACE;
-  }
+	VL53L1_Error status = VL53L1_ERROR_NONE;
+
+	if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, 1, &data))
+	{
+		status = VL53L1_ERROR_CONTROL_INTERFACE;
+	}
 
 	return status;
 }
 
+VL53L1_Error VL53L1_WrWord(
+	VL53L1_Dev_t *pdev,
+	uint16_t index,
+	uint16_t data)
+{
+	VL53L1_Error status = VL53L1_ERROR_NONE;
+	uint8_t _I2CBuffer[2];
+	_I2CBuffer[0] = data >> 8;
+	_I2CBuffer[1] = data & 0x00FF;
+	if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, 2, (uint8_t *)_I2CBuffer))
+	{
+		status = VL53L1_ERROR_CONTROL_INTERFACE;
+	}
+
+	return status;
+}
 
 VL53L1_Error VL53L1_WrDWord(
 	VL53L1_Dev_t *pdev,
-	uint16_t      index,
-	uint32_t      data)
+	uint16_t index,
+	uint32_t data)
 {
 	VL53L1_Error status = VL53L1_ERROR_NONE;
-  	uint8_t _I2CBuffer[4];
+	uint8_t _I2CBuffer[4];
 	_I2CBuffer[0] = (data >> 24) & 0xFF;
 	_I2CBuffer[1] = (data >> 16) & 0xFF;
 	_I2CBuffer[2] = (data >> 8) & 0xFF;
 	_I2CBuffer[3] = (data >> 0) & 0xFF;
 
 	if (!i2cdevWrite16(pdev->I2Cx, pdev->I2cDevAddr, index, 4, (uint8_t *)_I2CBuffer))
-  {
-    status = VL53L1_ERROR_CONTROL_INTERFACE;
-  }
+	{
+		status = VL53L1_ERROR_CONTROL_INTERFACE;
+	}
 
 	return status;
 }
 
-
 VL53L1_Error VL53L1_RdByte(
 	VL53L1_Dev_t *pdev,
-	uint16_t      index,
-	uint8_t      *pdata)
+	uint16_t index,
+	uint8_t *pdata)
 {
-	VL53L1_Error status         = VL53L1_ERROR_NONE;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 
 	if (!i2cdevRead16(pdev->I2Cx, pdev->I2cDevAddr, index, 1, pdata))
-  {
-    status = VL53L1_ERROR_CONTROL_INTERFACE;
-  }
+	{
+		status = VL53L1_ERROR_CONTROL_INTERFACE;
+	}
 
 	return status;
 }
@@ -277,14 +296,14 @@ VL53L1_Error VL53L1_RdDWord(
 
 VL53L1_Error VL53L1_WaitUs(
 	VL53L1_Dev_t *pdev,
-	int32_t       wait_us)
+	int32_t wait_us)
 {
-	VL53L1_Error status         = VL53L1_ERROR_NONE;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
 	uint32_t delay_ms = (wait_us + 900) / 1000;
 
-	if(delay_ms == 0)
+	if (delay_ms == 0)
 	{
-	  delay_ms = 1;
+		delay_ms = 1;
 	}
 
 	vTaskDelay(M2T(delay_ms));
@@ -292,14 +311,13 @@ VL53L1_Error VL53L1_WaitUs(
 	return status;
 }
 
-
 VL53L1_Error VL53L1_WaitMs(
 	VL53L1_Dev_t *pdev,
-	int32_t       wait_ms)
+	int32_t wait_ms)
 {
-  vTaskDelay(M2T(wait_ms));
+	vTaskDelay(M2T(wait_ms));
 
-  return VL53L1_ERROR_NONE;
+	return VL53L1_ERROR_NONE;
 }
 
 /*
@@ -315,14 +333,13 @@ VL53L1_Error VL53L1_GetTickCount(
 	return VL53L1_ERROR_NONE;
 }
 
-
 VL53L1_Error VL53L1_WaitValueMaskEx(
 	VL53L1_Dev_t *pdev,
-	uint32_t      timeout_ms,
-	uint16_t      index,
-	uint8_t       value,
-	uint8_t       mask,
-	uint32_t      poll_delay_ms)
+	uint32_t timeout_ms,
+	uint16_t index,
+	uint8_t value,
+	uint8_t mask,
+	uint32_t poll_delay_ms)
 {
 	/*
 	 * Platform implementation of WaitValueMaskEx V2WReg script command
@@ -335,26 +352,23 @@ VL53L1_Error VL53L1_WaitValueMaskEx(
 	 *          poll_delay_ms);
 	 */
 
-	VL53L1_Error status         = VL53L1_ERROR_NONE;
-	uint32_t     start_time_ms   = 0;
-	uint32_t     current_time_ms = 0;
-	uint8_t      byte_value      = 0;
-	uint8_t      found           = 0;
+	VL53L1_Error status = VL53L1_ERROR_NONE;
+	uint32_t start_time_ms = 0;
+	uint32_t current_time_ms = 0;
+	uint8_t byte_value = 0;
+	uint8_t found = 0;
 #ifdef VL53L1_LOG_ENABLE
-	uint32_t     trace_functions = 0;
+	uint32_t trace_functions = 0;
 #endif
 
 	SUPPRESS_UNUSED_WARNING(poll_delay_ms);
 
 #ifdef VL53L1_LOG_ENABLE
-	/* look up register name */
-	VL53L1_get_register_name(
-			index,
-			register_name);
+	
 
 	/* Output to I2C logger for FMT/DFT  */
-	trace_i2c("WaitValueMaskEx(%5d, %s, 0x%02X, 0x%02X, %5d);\n",
-		timeout_ms, register_name, value, mask, poll_delay_ms);
+	DEBUG_PRINTI("WaitValueMaskEx(%5d, %s, 0x%02X, 0x%02X, %5d);\n",
+			  timeout_ms, "register_name", value, mask, poll_delay_ms);
 #endif // VL53L1_LOG_ENABLE
 
 	/* calculate time limit in absolute time */
@@ -377,21 +391,21 @@ VL53L1_Error VL53L1_WaitValueMaskEx(
 		   (found == 0))
 	{
 		status = VL53L1_RdByte(
-						pdev,
-						index,
-						&byte_value);
+			pdev,
+			index,
+			&byte_value);
 
 		if ((byte_value & mask) == value)
 		{
 			found = 1;
 		}
 
-		if (status == VL53L1_ERROR_NONE  &&
+		if (status == VL53L1_ERROR_NONE &&
 			found == 0 &&
 			poll_delay_ms > 0)
 			status = VL53L1_WaitMs(
-							pdev,
-							poll_delay_ms);
+				pdev,
+				poll_delay_ms);
 
 		/* Update polling time (Compare difference rather than absolute to
 		negate 32bit wrap around issue) */
@@ -404,4 +418,3 @@ VL53L1_Error VL53L1_WaitValueMaskEx(
 
 	return status;
 }
-

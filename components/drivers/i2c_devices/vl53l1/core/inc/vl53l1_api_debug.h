@@ -76,6 +76,7 @@ extern "C" {
 #endif
 
 
+#define VL53L1_LOG_ENABLE
 
 /* Start Patch_AdditionalDebugData_11823 */
 
