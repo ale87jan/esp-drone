@@ -1,0 +1,18 @@
+{
+  "idf.portWin": "COM5",
+  "idf.flashType": "UART",
+  "idf.espIdfPathWin": "${env:USERPROFILE}\\esp\\v5.0.9\\esp-idf",
+  "idf.toolsPathWin": "${env:USERPROFILE}\\.espressif",
+  "idf.pythonInstallPath": "${env:USERPROFILE}\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
+  "files.associations": {
+    "vl53l1_def.h": "c",
+    "debug_cf.h": "c",
+    "stabilizer_types.h": "c",
+    "vl53l1_platform_log.h": "c",
+    "vl53l1_ll_def.h": "c",
+    "vl53l1_preset_setup.h": "c",
+    "vl53l1_api_calibration.h": "c",
+    "vl53l1_api_debug.h": "c",
+    "vl53l1_ll_device.h": "c"
+  }
+}
